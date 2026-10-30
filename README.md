@@ -19,7 +19,7 @@ Theos / Logos 插件，注入 SpringBoard，在重启（respring）完成后弹�
 
 ## 在 Windows 上使用 GitHub Actions 编译
 
-1. 将生成项目放在 GitHub 仓库根目录，提交所有文件（包括 `.github/workflows/build.yml`）。
+1. 当前目录就是仓库根目录（已 `git init -b main` 并完成首次提交），把整个目录推到 GitHub 即可，务必包含 `.github/workflows/build.yml`。
 2. 默认向 `main` / `master` 推送或提交 PR 时触发编译；其他分支需修改 workflow 的 branches。
 3. 也可在默认分支包含 workflow 后，从 **Actions → Build Theos packages → Run workflow** 手动触发。
 4. 在成功运行的 **Artifacts** 下载 `HelloWorld-<模式>`，解压 ZIP 获取 `.deb`。构建日志为 `build-log-<模式>`，保留 14 天。
