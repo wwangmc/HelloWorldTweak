@@ -1,8 +1,12 @@
 # HelloWorld
 
+![Build Theos packages](https://github.com/wwangmc/HelloWorldTweak/actions/workflows/build.yml/badge.svg)
+
 Theos / Logos 插件，注入 SpringBoard，在重启（respring）完成后弹出 `Hello World` 弹窗。包含 GitHub Actions 云端编译配置。
 
 包名：`com.example.helloworld`。目标进程：`SpringBoard`，注入范围见 `HelloWorld.plist`。
+
+仓库：<https://github.com/wwangmc/HelloWorldTweak>
 
 ## 功能实现
 
@@ -34,7 +38,21 @@ CI 启用的模式：rootfull, rootless, roothide。完整的模式参数对应�
 
 部署目标仅表示编译下限，实际可用性取决于越狱、注入器、设备和功能所用 API。
 当前工具链不能生成适用于 iOS 12–13 的旧 arm64e ABI；rootfull 的 arm64 包不承诺支持这些系统上向 arm64e 系统进程注入。
-workflow 只编译打包并上传 Artifacts。本项目尚未在 Actions 或 macOS 上实际构建验证，请以 CI 结果为准。
+workflow 只编译打包并上传 Artifacts。
+
+## 构建验证结果
+
+2026-10-30 在 GitHub Actions 上实跑通过（run `40998842855`，三个 job 全部 `success`），产物经解包核对：
+
+| 模式 | 产物 | dylib 架构 | 安装前缀 |
+| --- | --- | --- | --- |
+| rootfull | `com.example.helloworld_0.1.0_iphoneos-arm.deb` | thin arm64 | `/Library/MobileSubstrate/DynamicLibraries/` |
+| rootless | `com.example.helloworld_0.1.0_iphoneos-arm64.deb` | fat arm64 + arm64e | `/var/jb/Library/MobileSubstrate/DynamicLibraries/` |
+| roothide | `com.example.helloworld_0.1.0_iphoneos-arm64e.deb` | fat arm64 + arm64e | `/Library/MobileSubstrate/DynamicLibraries/` |
+
+三个包内的 `HelloWorld.plist` 过滤规则均为 `com.apple.springboard`；dylib 中包含 `SpringBoard`、`applicationDidFinishLaunching`、`UIAlertController` 等字符串，说明 Logos hook 已编入。编译日志只有 Theos 自身链接参数带来的 `ld: warning: -multiply_defined is obsolete`，没有代码告警。
+
+尚未验证的部分：真机安装后的弹窗时序与显示效果（需要越狱设备实测）。
 
 下载到 `.deb` 后，在 iOS 上用 Filza / Sileo / `dpkg -i` 安装对应模式的包，然后 respring 即可看到弹窗。安装模式必须与设备越狱形态匹配（rootless 设备装 `TYPE=1` 的包，RootHide 设备装 `TYPE=2` 的包）。
 
