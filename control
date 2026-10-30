@@ -1,0 +1,9 @@
+Package: com.example.helloworld
+Name: HelloWorld
+Version: 0.1.0
+Architecture: iphoneos-arm
+Description: Show a Hello World alert when SpringBoard starts.
+Maintainer: Developer
+Author: Developer
+Section: Tweaks
+Depends: mobilesubstrate
