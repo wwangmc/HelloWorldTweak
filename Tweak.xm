@@ -1,49 +1,55 @@
 #import <Foundation/Foundation.h>
 #import <UIKit/UIKit.h>
 
-// 同一个 SpringBoard 生命周期内只弹一次，避免重复展示。
-static BOOL gHelloAlertShown = NO;
-
-static UIViewController *HelloTopViewController(void) {
-    UIApplication *app = [UIApplication sharedApplication];
-    if (!app) {
-        return nil;
-    }
-
-    UIWindow *keyWindow = nil;
-    for (UIWindow *window in app.windows) {
-        if (window.isKeyWindow && !window.isHidden && window.alpha > 0.0) {
-            keyWindow = window;
-            break;
-        }
-    }
-    if (!keyWindow) {
-        for (UIWindow *window in [app.windows reverseObjectEnumerator]) {
-            if (!window.isHidden) {
-                keyWindow = window;
-                break;
-            }
-        }
-    }
-
-    UIViewController *controller = keyWindow.rootViewController;
-    while (controller.presentedViewController) {
-        controller = controller.presentedViewController;
-    }
-    return controller;
+// 调试标记：/var/mobile/HelloWorld-<tag> 出现即代表对应阶段已执行（验证用，后续可移除）。
+static void HelloMark(NSString *tag) {
+    NSString *path = [@"/var/mobile/HelloWorld-" stringByAppendingString:tag];
+    [[tag dataUsingEncoding:NSUTF8StringEncoding] writeToFile:path atomically:YES];
 }
 
-// 返回 YES 表示弹窗已经展示（或已经展示过），NO 表示当前还拿不到可用的视图控制器。
+// 自己持有一个高层级窗口承载弹窗，避免直接向 SpringBoard 的 rootViewController 弹出时被静默忽略。
+static UIWindow *gHelloAlertWindow = nil;
+static BOOL gHelloAlertShown = NO;
+
 static BOOL HelloShowAlert(void) {
     if (gHelloAlertShown) {
         return YES;
     }
-
-    UIViewController *presenter = HelloTopViewController();
-    if (!presenter) {
+    if (![NSThread isMainThread]) {
+        dispatch_async(dispatch_get_main_queue(), ^{
+            HelloShowAlert();
+        });
         return NO;
     }
+
+    UIApplication *app = [UIApplication sharedApplication];
+    if (!app) {
+        return NO;
+    }
+
+    // 等 SpringBoard 至少有一个可见窗口，代表主界面已经起来了。
+    UIWindow *host = nil;
+    for (UIWindow *window in app.windows) {
+        if (!window.isHidden && window.alpha > 0.0) {
+            host = window;
+            break;
+        }
+    }
+    if (!host) {
+        return NO;
+    }
+
     gHelloAlertShown = YES;
+
+    UIWindow *alertWindow = [[UIWindow alloc] initWithFrame:host.bounds];
+    alertWindow.windowLevel = UIWindowLevelAlert + 1;
+    alertWindow.backgroundColor = [UIColor clearColor];
+
+    UIViewController *root = [[UIViewController alloc] init];
+    root.view.backgroundColor = [UIColor clearColor];
+    alertWindow.rootViewController = root;
+    [alertWindow makeKeyAndVisible];
+    gHelloAlertWindow = alertWindow;
 
     UIAlertController *alert =
         [UIAlertController alertControllerWithTitle:@"Hello World"
@@ -51,9 +57,15 @@ static BOOL HelloShowAlert(void) {
                                      preferredStyle:UIAlertControllerStyleAlert];
     [alert addAction:[UIAlertAction actionWithTitle:@"OK"
                                               style:UIAlertActionStyleDefault
-                                            handler:nil]];
-    [presenter presentViewController:alert animated:YES completion:nil];
-    NSLog(@"[HelloWorld] alert presented by %@", NSStringFromClass([presenter class]));
+                                            handler:^(__unused UIAlertAction *action) {
+        gHelloAlertWindow.hidden = YES;
+        gHelloAlertWindow = nil;
+        HelloMark(@"dismissed");
+    }]];
+    [root presentViewController:alert animated:YES completion:^{
+        HelloMark(@"shown");
+    }];
+    NSLog(@"[HelloWorld] alert requested");
     return YES;
 }
 
@@ -68,17 +80,18 @@ static void HelloTryShowAlert(NSUInteger remaining) {
     });
 }
 
-// 启动完成后延时尝试弹窗；两个触发入口共用，互不重复。
+// 启动完成后延时尝试弹窗；多个触发入口共用，靠 gHelloAlertShown 去重。
 static void HelloScheduleAlert(void) {
     dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(1.0 * NSEC_PER_SEC)),
                    dispatch_get_main_queue(), ^{
-        HelloTryShowAlert(8);
+        HelloTryShowAlert(10);
     });
 }
 
 %ctor {
     @autoreleasepool {
         NSLog(@"[HelloWorld] Loaded");
+        HelloMark(@"ctor");
 
         // 触发入口一：SpringBoard 启动完成通知。
         [[NSNotificationCenter defaultCenter]
@@ -86,6 +99,7 @@ static void HelloScheduleAlert(void) {
                         object:nil
                          queue:[NSOperationQueue mainQueue]
                     usingBlock:^(__unused NSNotification *note) {
+            HelloMark(@"notification");
             HelloScheduleAlert();
         }];
 
@@ -102,6 +116,7 @@ static void HelloScheduleAlert(void) {
 
 - (void)applicationDidFinishLaunching:(UIApplication *)application {
     %orig;
+    HelloMark(@"didFinishLaunching");
     HelloScheduleAlert();
 }
 
