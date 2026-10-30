@@ -44,6 +44,11 @@ static BOOL HelloShowAlert(void) {
     UIWindow *alertWindow = [[UIWindow alloc] initWithFrame:host.bounds];
     alertWindow.windowLevel = UIWindowLevelAlert + 1;
     alertWindow.backgroundColor = [UIColor clearColor];
+    // iOS 13+ 必须有 windowScene，否则窗口不会真正上屏（弹窗"成功"但看不见）。
+    if ([alertWindow respondsToSelector:@selector(setWindowScene:)] && host.windowScene) {
+        alertWindow.windowScene = host.windowScene;
+        HelloMark(@"windowScene");
+    }
 
     UIViewController *root = [[UIViewController alloc] init];
     root.view.backgroundColor = [UIColor clearColor];
@@ -64,6 +69,11 @@ static BOOL HelloShowAlert(void) {
     }]];
     [root presentViewController:alert animated:YES completion:^{
         HelloMark(@"shown");
+        dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.5 * NSEC_PER_SEC)),
+                       dispatch_get_main_queue(), ^{
+            BOOL visible = (alert.view.window != nil) && (alertWindow.isHidden == NO);
+            HelloMark(visible ? @"visible" : @"invisible");
+        });
     }];
     NSLog(@"[HelloWorld] alert requested");
     return YES;
